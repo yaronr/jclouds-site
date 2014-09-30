@@ -50,7 +50,44 @@ context.close();
 
 ## Using EC2
 
+Required Maven dependencies:
+<dependency>
+	<groupId>org.apache.jclouds</groupId>
+	<artifactId>jclouds-all</artifactId>
+	<version>1.8.0</version>
+</dependency>
+<dependency>
+	<groupId>org.apache.jclouds.driver</groupId>
+	<artifactId>jclouds-log4j</artifactId>
+	<version>1.8.0</version>
+</dependency>
+<dependency>
+	<groupId>org.apache.jclouds.driver</groupId>
+	<artifactId>jclouds-sshj</artifactId>
+	<version>1.8.0</version>
+</dependency>
+* Note - make sure that the dependency is 'JAR'
+
 {% highlight java %}
+
+import java.util.Set;
+
+import org.jclouds.ContextBuilder;
+import org.jclouds.aws.ec2.AWSEC2Api;
+import org.jclouds.aws.ec2.compute.AWSEC2TemplateOptions;
+import org.jclouds.compute.ComputeServiceContext;
+import org.jclouds.compute.domain.Image;
+import org.jclouds.compute.domain.NodeMetadata;
+import org.jclouds.compute.domain.OsFamily;
+import org.jclouds.compute.domain.Template;
+import org.jclouds.domain.Location;
+import org.jclouds.logging.log4j.config.Log4JLoggingModule;
+import org.jclouds.sshj.config.SshjSshClientModule;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+import com.google.inject.Module;
+
 // get a context with ec2 that offers the portable ComputeService API
 ComputeServiceContext context = ContextBuilder.newBuilder("aws-ec2")
                       .credentials(accesskeyid, secretkey)
@@ -77,12 +114,14 @@ template.getOptions().as(AWSEC2TemplateOptions.class).keyPair(keyPair);
 Set<? extends NodeMetadata> nodes = context.getComputeService().createNodesInGroup("webserver", 2, template);
 
 // when you need access to very ec2-specific features, use the provider-specific context
-AWSEC2Client ec2Client = AWSEC2Client.class.cast(context.getProviderSpecificContext().getApi());
+AWSEC2Api ec2Client = context.unwrapApi(AWSEC2Api.class);
 
 // ex. to get an ip and associate it with a node
 NodeMetadata node = Iterables.get(nodes, 0);
-String ip = ec2Client.getElasticIPAddressServices().allocateAddressInRegion(node.getLocation().getId());
-ec2Client.getElasticIPAddressServices().associateAddressInRegion(node.getLocation().getId(),ip, node.getProviderId());
+
+ElasticIPAddressApi elasticIpApi = ec2Client.getElasticIPAddressApi().get();
+String ip = elasticIpApi.allocateAddressInRegion(node.getLocation().getId());
+elasticIpApi.associateAddressInRegion(node.getLocation().getId(),ip, node.getProviderId());
 
 context.close();
 {% endhighlight %}
